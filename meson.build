@@ -1,4 +1,4 @@
-project('mlibc', default_options: ['warning_level=2', 'c_std=gnu11', 'cpp_std=c++20'], meson_version: '>=1.3.0')
+project('mlibc', version: '6.0.1', default_options: ['warning_level=2', 'c_std=gnu11', 'cpp_std=c++20'], meson_version: '>=1.3.0')
 
 fs = import('fs')
 
@@ -272,6 +272,10 @@ elif host_machine.system() == 'nyaux'
 	rtld_include_dirs += include_directories('sysdeps/nyaux/include')
 	libc_include_dirs += include_directories('sysdeps/nyaux/include')
 	subdir('sysdeps/nyaux')
+elif host_machine.system() == 'lanos'
+	rtld_include_dirs += include_directories('sysdeps/lanos/include')
+	libc_include_dirs += include_directories('sysdeps/lanos/include')
+	subdir('sysdeps/lanos')
 else
 	error('No sysdeps defined for OS: ' + host_machine.system())
 endif
