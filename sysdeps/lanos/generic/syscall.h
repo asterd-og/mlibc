@@ -1,106 +1,18 @@
 #pragma once
 #include <stddef.h>
+#include <stdint.h>
 
-size_t __syscall0(size_t rax) {
-    size_t ret;
-    __asm__ volatile (
-        "movq %1, %%rax\n"
-        "int $0x80"
-        : "=a"(ret)
-        : "r"(rax)
-    );
-    return ret;
-}
+static long syscall(uint64_t num, uint64_t p1 = 0, uint64_t p2 = 0, uint64_t p3 = 0, uint64_t p4 = 0, uint64_t p5 = 0, uint64_t p6 = 0) {
+    volatile long ret;
 
-size_t __syscall1(size_t rax, size_t rdi) {
-    size_t ret;
-    __asm__ volatile (
-        "movq %1, %%rax\n"
-        "movq %2, %%rdi\n"
-        "int $0x80"
-        : "=a"(ret)
-        : "r"(rax), "r"(rdi)
-        : "rdi"
-    );
-    return ret;
-}
+    register uint64_t r4 asm("r10") = p4;
+    register uint64_t r5 asm("r8") = p5;
+    register uint64_t r6 asm("r9") = p6;
 
-size_t __syscall2(size_t rax, size_t rdi, size_t rsi) {
-    size_t ret;
-    __asm__ volatile (
-        "movq %1, %%rax\n"
-        "movq %2, %%rdi\n"
-        "movq %3, %%rsi\n"
-        "int $0x80"
+    asm volatile("syscall"
         : "=a"(ret)
-        : "r"(rax), "r"(rdi), "r"(rsi)
-        : "rdi", "rsi"
-    );
-    return ret;
-}
-
-size_t __syscall3(size_t rax, size_t rdi, size_t rsi, size_t rdx) {
-    size_t ret;
-    __asm__ volatile (
-        "movq %1, %%rax\n"
-        "movq %2, %%rdi\n"
-        "movq %3, %%rsi\n"
-        "movq %4, %%rdx\n"
-        "int $0x80"
-        : "=a"(ret)
-        : "r"(rax), "r"(rdi), "r"(rsi), "r"(rdx)
-        : "rdi", "rsi", "rdx"
-    );
-    return ret;
-}
-
-size_t __syscall4(size_t rax, size_t rdi, size_t rsi, size_t rdx, size_t r10) {
-    size_t ret;
-    __asm__ volatile (
-        "movq %1, %%rax\n"
-        "movq %2, %%rdi\n"
-        "movq %3, %%rsi\n"
-        "movq %4, %%rdx\n"
-        "movq %5, %%r10\n"
-        "int $0x80"
-        : "=a"(ret)
-        : "r"(rax), "r"(rdi), "r"(rsi), "r"(rdx), "r"(r10)
-        : "rdi", "rsi", "rdx"
-    );
-    return ret;
-}
-
-size_t __syscall5(size_t rax, size_t rdi, size_t rsi, size_t rdx, size_t r10, size_t r8) {
-    size_t ret;
-    __asm__ volatile (
-        "movq %1, %%rax\n"
-        "movq %2, %%rdi\n"
-        "movq %3, %%rsi\n"
-        "movq %4, %%rdx\n"
-        "movq %5, %%r10\n"
-        "movq %6, %%r8\n"
-        "int $0x80"
-        : "=a"(ret)
-        : "r"(rax), "r"(rdi), "r"(rsi), "r"(rdx), "r"(r10), "r"(r8)
-        : "rdi", "rsi", "rdx"
-    );
-    return ret;
-}
-
-size_t __syscall6(size_t rax, size_t rdi, size_t rsi, size_t rdx, size_t r10, size_t r8, size_t r9) {
-    size_t ret;
-    __asm__ volatile (
-        "movq %1, %%rax\n"
-        "movq %2, %%rdi\n"
-        "movq %3, %%rsi\n"
-        "movq %4, %%rdx\n"
-        "movq %5, %%r10\n"
-        "movq %6, %%r8\n"
-        "movq %7, %%r9\n"
-        "int $0x80"
-        : "=a"(ret)
-        : "r"(rax), "r"(rdi), "r"(rsi), "r"(rdx), "r"(r10), "r"(r8), "r"(r9)
-        : "rdi", "rsi", "rdx"
-    );
+        : "a"(num), "D"(p1), "S"(p2), "d"(p3), "r"(r4),
+        "r"(r5), "r"(r6)
+        : "memory", "rcx", "r11");
     return ret;
 }

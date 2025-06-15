@@ -8,6 +8,7 @@
 #include <bits/ssize_t.h>
 #include <abi-bits/stat.h>
 #include <mlibc/fsfd_target.hpp>
+#include <mlibc/debug.hpp>
 #include "syscall.h"
 #include <string.h>
 
@@ -17,28 +18,29 @@
 namespace [[gnu::visibility("hidden")]] mlibc {
 
 [[noreturn]] void sys_exit(int status) {
-    __syscall1(60, status);
+    syscall(60, status);
     __builtin_unreachable();
 }
 
 void sys_libc_log(const char *message) {
-    __syscall3(1 /* write() */, 3, (size_t)message, strlen(message));
-    __syscall3(1 /* write() */, 3, (size_t)"\n", 1);
+    syscall(1 /* write() */, 3, (size_t)message, strlen(message));
+    syscall(1 /* write() */, 3, (size_t)"\n", 1);
 }
 [[noreturn]] void sys_libc_panic() {
     sys_libc_log("\n[MLIBC]: Panic!");
-    __syscall1(60 /* exit() */, 1);
+    syscall(60 /* exit() */, 1);
+    __builtin_unreachable();
 }
 
 int sys_tcb_set(void *pointer) {
-    auto ret = __syscall2(158, 0x1002, (size_t)pointer);
+    auto ret = syscall(158, 0x1002, (size_t)pointer);
     if (ret < 0)
         return -ret;
     return 0;
 }
 
 [[gnu::weak]] int sys_futex_tid() {
-    return __syscall0(186);
+    return syscall(186);
 }
 int sys_futex_wait(int *pointer, int expected, const struct timespec *time) {
     sys_libc_log("[MLIBC]: sys_futex_wait stub!");
@@ -50,7 +52,7 @@ int sys_futex_wake(int *pointer) {
 }
 
 int sys_getpid() {
-    return __syscall0(39);
+    return syscall(39);
 }
 
 int sys_getppid() {
@@ -59,7 +61,7 @@ int sys_getppid() {
 }
 
 int sys_open(const char *pathname, int flags, mode_t mode, int *fd) {
-    auto ret = __syscall3(2, (size_t)pathname, flags, mode);
+    auto ret = syscall(2, (size_t)pathname, flags, mode);
     if (ret < 0)
         return -ret;
     *fd = ret;
@@ -67,7 +69,7 @@ int sys_open(const char *pathname, int flags, mode_t mode, int *fd) {
 }
 
 int sys_read(int fd, void *buf, size_t count, ssize_t *bytes_read) {
-    ssize_t read = (ssize_t)__syscall3(0, fd, (size_t)buf, count);
+    ssize_t read = (ssize_t)syscall(0, fd, (size_t)buf, count);
     if (read < 0)
         return -read;
     *bytes_read = read;
@@ -75,7 +77,7 @@ int sys_read(int fd, void *buf, size_t count, ssize_t *bytes_read) {
 }
 
 int sys_write(int fd, const void *buf, size_t count, ssize_t *bytes_written) {
-    ssize_t written = (ssize_t)__syscall3(1, fd, (size_t)buf, count);
+    ssize_t written = (ssize_t)syscall(1, fd, (size_t)buf, count);
     if (written < 0)
         return -written;
     *bytes_written = written;
@@ -88,7 +90,7 @@ int sys_clock_get(int clock, time_t *secs, long *nanos) {
 }
 
 int sys_seek(int fd, off_t offset, int whence, off_t *new_offset) {
-    auto ret = __syscall3(8, fd, offset, whence);
+    auto ret = syscall(8, fd, offset, whence);
     if (ret < 0)
         return -ret;
     *new_offset = ret;
@@ -112,21 +114,25 @@ int sys_tcsetpgrp(int fd, pid_t pgid) {
 [[gnu::weak]] int sys_stat(fsfd_target fsfdt, int fd, const char *path, int flags, struct stat *statbuf) {
     switch (fsfdt) {
         case fsfd_target::fd:
-            __syscall2(5, fd, (size_t)statbuf);
+            syscall(5, fd, (size_t)statbuf);
             break;
         case fsfd_target::path:
-            __syscall2(4, (size_t)path, (size_t)statbuf);
+            syscall(4, (size_t)path, (size_t)statbuf);
             break;
         case fsfd_target::fd_path:
             sys_libc_log("[MLIBC]: sys_stat fsfd_target::fd_path not implemented!");
             return ENOSYS;
+            break;
+        default:
+            sys_libc_log("[MLIBC]: sys_stat invalid fsfd_target!");
+            return EINVAL;
             break;
     }
     return 0;
 }
 // mlibc assumes that anonymous memory returned by sys_vm_map() is zeroed by the kernel / whatever is behind the sysdeps
 int sys_vm_map(void *addr, size_t length, int prot, int flags, int fd, off_t offset, void **window) {
-    *window = (void*)__syscall6(9, (size_t)addr, length, prot, flags, fd, offset);
+    *window = (void*)syscall(9, (size_t)addr, length, prot, flags, fd, offset);
     return 0;
 }
 int sys_vm_unmap(void *pointer, size_t size) {
@@ -166,8 +172,34 @@ gid_t sys_getegid() {
     return 0;
 }
 
+int sys_kill(int pid, int sig) {
+    auto ret = syscall(62, pid, sig);
+    if (ret < 0)
+        return -ret;
+    return 0;
+}
+
+int sys_fork(pid_t *child) {
+    auto ret = syscall(57);
+    if (ret < 0)
+        return -ret;
+    *child = ret;
+    return 0;
+}
+
+extern "C" void __mlibc_signal_restore();
+
 int sys_sigaction(int signum, const struct sigaction *act, struct sigaction *oldact) {
-    sys_libc_log("[MLIBC]: sys_sigaction stub!");
+    struct sigaction new_act;
+    if (act) {
+        new_act.sa_handler = act->sa_handler;
+        new_act.sa_flags = act->sa_flags | SA_RESTORER;
+        new_act.sa_restorer = __mlibc_signal_restore;
+        memcpy(&new_act.sa_mask, &act->sa_mask, sizeof(sigset_t));
+    }
+    auto ret = syscall(13, signum, (size_t)(act ? &new_act : NULL), (size_t)oldact);
+    if (ret < 0)
+        return -ret;
     return 0;
 }
 
@@ -200,14 +232,14 @@ int sys_isatty(int fd) {
 }
 
 int sys_getcwd(char *buf, size_t size) {
-    int ret = __syscall2(79, (size_t)buf, size);
+    int ret = syscall(79, (size_t)buf, size);
     if (ret < 0)
         return -ret;
     return 0;
 }
 
 int sys_chdir(const char *path) {
-    int ret = __syscall1(80, (size_t)path);
+    int ret = syscall(80, (size_t)path);
     if (ret < 0)
         return -ret;
     return 0;

@@ -11,7 +11,8 @@ rtld_sources += files(
 
 libc_sources += files(
 	'generic/entry.cpp',
-	'generic/generic.cpp'
+	'generic/generic.cpp',
+	'x86_64/signal.S'
 )
 
 if not no_headers
