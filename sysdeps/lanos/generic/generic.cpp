@@ -5,6 +5,7 @@
 #include <abi-bits/seek-whence.h>
 #include <abi-bits/vm-flags.h>
 #include <bits/off_t.h>
+#include <abi-bits/resource.h>
 #include <bits/ssize_t.h>
 #include <abi-bits/stat.h>
 #include <mlibc/fsfd_target.hpp>
@@ -152,6 +153,15 @@ int sys_anon_free(void *pointer, size_t size) {
     return 0;
 }
 
+int sys_waitpid(pid_t pid, int *status, int flags, struct rusage *ru, pid_t *ret_pid) {
+    (void)ru;
+    auto ret = syscall(61, pid, (uint64_t)status, flags);
+    if (ret < 0)
+        return -ret;
+    *ret_pid = (pid_t)ret;
+    return 0;
+}
+
 uid_t sys_getuid() {
     sys_libc_log("[MLIBC]: sys_getuid stub (returns root for now)!");
     return 0;
@@ -184,6 +194,13 @@ int sys_fork(pid_t *child) {
     if (ret < 0)
         return -ret;
     *child = ret;
+    return 0;
+}
+
+int sys_execve(const char *path, char *const *argv, char *const *envp) {
+    auto ret = syscall(59, (uint64_t)path, (uint64_t)argv, (uint64_t)envp);
+    if (ret < 0)
+        return -ret;
     return 0;
 }
 
