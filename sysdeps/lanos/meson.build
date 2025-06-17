@@ -71,6 +71,11 @@ if not no_headers
 		subdir: 'abi-bits',
 		follow_symlinks: true
 	)
+
+	install_headers(
+		'include/lan/fb.h',
+		subdir: 'lan',
+	)
 endif
 
 if not headers_only

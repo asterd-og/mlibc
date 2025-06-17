@@ -10,8 +10,14 @@
 #include <abi-bits/stat.h>
 #include <mlibc/fsfd_target.hpp>
 #include <mlibc/debug.hpp>
+#include <abi-bits/fcntl.h>
+#include <abi-bits/utsname.h>
+#include <abi-bits/termios.h>
 #include "syscall.h"
 #include <string.h>
+
+#define TCGETS 0x5401
+#define TCSETS 0x5402
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -97,6 +103,7 @@ int sys_seek(int fd, off_t offset, int whence, off_t *new_offset) {
     *new_offset = ret;
     return 0;
 }
+
 int sys_close(int fd) {
     sys_libc_log("[MLIBC]: sys_close stub!");
     return 0;
@@ -104,11 +111,24 @@ int sys_close(int fd) {
 
 int sys_tcgetpgrp(int fd, pid_t *pgid) {
     sys_libc_log("[MLIBC]: sys_tcgetpgrp stub!");
-    return 0;
+    return -EINVAL;
 }
 
 int sys_tcsetpgrp(int fd, pid_t pgid) {
     sys_libc_log("[MLIBC]: sys_tcsetpgrp stub!");
+    return -EINVAL;
+}
+
+int sys_getpgid(pid_t pid, pid_t *pgid) {
+    *pgid = 0;
+    return 0;
+}
+
+int sys_ioctl(int fd, unsigned long request, void *arg, int *result) {
+    auto ret = syscall(16, fd, request, (uint64_t)arg);
+    if (ret < 0)
+        return -ret;
+    *result = ret;
     return 0;
 }
 
@@ -204,6 +224,22 @@ int sys_execve(const char *path, char *const *argv, char *const *envp) {
     return 0;
 }
 
+int sys_tcgetattr(int fd, struct termios *attrs) {
+    int ret = 0;
+    sys_ioctl(fd, TCGETS, attrs, &ret);
+    if (ret < 0)
+        ret = -ret;
+    return ret;
+}
+
+int sys_tcsetattr(int fd, int optional_actions, const struct termios *attrs) {
+    int ret = 0;
+    sys_ioctl(fd, TCSETS, (void*)attrs, &ret);
+    if (ret < 0)
+        ret = -ret;
+    return ret;
+}
+
 extern "C" void __mlibc_signal_restore();
 
 int sys_sigaction(int signum, const struct sigaction *act, struct sigaction *oldact) {
@@ -244,7 +280,10 @@ int sys_gethostname(char *name, size_t len) {
 }
 
 int sys_isatty(int fd) {
-    sys_libc_log("[MLIBC]: sys_isatty stub!");
+    struct termios t;
+    auto ret = syscall(16, fd, TCGETS, (uint64_t)&t);
+    if (ret < 0)
+        return -ret;
     return 0;
 }
 
